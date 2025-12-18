@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     # ============================================================
     openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key")
 
+    # ============================================================
+    # N-Atlas Configuration (Nigeria)
+    # ============================================================
+    n_atlas_api_base: str = Field(default="https://tosinamuda--natlas-full-vllm-serve.modal.run/v1", description="N-Atlas VLLM API Base URL")
+    n_atlas_model_id: str = Field(default="openai/n-atlas", description="N-Atlas Model ID")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):

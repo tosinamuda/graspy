@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from fastapi import Request
 
-from .services.curriculum import CurriculumService
-from .services.lessons import LessonService
-from .services.subjects import SubjectService
-from .services.users import UserService
-from .services.tutor import TutorService
-from .services.strands import StrandsRuntime
+from .domains.curriculum.service import CurriculumService
+from .domains.lesson.service import LessonService
+from .domains.subjects.service import SubjectService
+from .domains.user.service import UserService
+from .domains.tutor.service import TutorService
+from .domains.study.service import StudyService
 from .settings import Settings
 
 
@@ -27,13 +27,12 @@ def get_lesson_service(request: Request) -> LessonService:
     return request.app.state.lesson_service
 
 
-def get_strands_runtime(request: Request) -> StrandsRuntime:
-    return request.app.state.strands_runtime
-
-
 def get_subject_service(request: Request) -> SubjectService:
     return request.app.state.subject_service
 
 
 def get_tutor_service(request: Request) -> TutorService:
     return request.app.state.tutor_service
+
+def get_study_service(request: Request) -> StudyService:
+    return request.app.state.study_service

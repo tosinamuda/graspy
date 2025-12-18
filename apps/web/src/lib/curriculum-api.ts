@@ -1,5 +1,5 @@
-import type { CurriculumSubject, LearningSession } from '@/lib/curriculum-db';
-import type { LessonSlide } from '@/lib/lesson-types';
+import type { CurriculumSubject, LearningSession } from "@/lib/curriculum-db";
+import type { LessonSlide } from "@/lib/lesson-types";
 
 /**
  * Curriculum API Client
@@ -58,19 +58,74 @@ export interface LessonResponse {
 }
 
 export type LessonStreamPhase =
-  | 'initializing'
-  | 'generating_slides'
-  | 'slides_ready'
-  | 'generating_practice'
-  | 'complete'
-  | 'error';
+  | "initializing"
+  | "planning"
+  | "generating_slides"
+  | "slides_ready"
+  | "generating_practice"
+  | "complete"
+  | "error";
 
-export interface LessonStreamEvent {
-  type: 'status' | 'complete' | 'error';
-  phase?: LessonStreamPhase;
-  message?: string;
-  payload?: LessonResponse;
+export interface LessonPlanPayload {
+  learningObjectives: string[];
+  keyPoints: string[];
+  slideSpecs: Array<{
+    slideType: string;
+    title: string;
+    focus: string;
+    keyConcept: string;
+  }>;
 }
+
+export interface LessonPracticePayload {
+  question: string;
+  options: string[];
+  answerIndex: number;
+  correctFeedback: string;
+  incorrectFeedback: string;
+}
+
+export type LessonStreamEvent =
+  | {
+      type: "status" | "error";
+      phase?: LessonStreamPhase;
+      message?: string;
+      payload?: never;
+      index?: number;
+      total?: number;
+    }
+  | {
+      type: "plan";
+      phase?: LessonStreamPhase;
+      message?: string;
+      payload: LessonPlanPayload;
+      index?: number;
+      total?: number;
+    }
+  | {
+      type: "slide";
+      phase?: LessonStreamPhase;
+      message?: string;
+      payload: LessonSlide;
+      index: number;
+      total: number;
+    }
+  | {
+      type: "practice";
+      phase?: LessonStreamPhase;
+      message?: string;
+      payload: LessonPracticePayload;
+      index?: number;
+      total?: number;
+    }
+  | {
+      type: "complete";
+      phase?: LessonStreamPhase;
+      message?: string;
+      payload: LessonResponse;
+      index?: number;
+      total?: number;
+    };
 
 /**
  * Generate curriculum (non-streaming)
@@ -79,23 +134,25 @@ export async function generateCurriculum(
   request: CurriculumRequest
 ): Promise<CurriculumResponse> {
   const response = await fetch(`${API_BASE_URL}/curriculum/generate`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || 'Failed to generate curriculum');
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Network error" }));
+    throw new Error(error.error || "Failed to generate curriculum");
   }
 
   return response.json();
 }
 
 export async function generateLessonSession(
-  request: LessonRequest,
+  request: LessonRequest
 ): Promise<LessonResponse> {
   const params = new URLSearchParams({
     country: request.country,
@@ -107,37 +164,41 @@ export async function generateLessonSession(
   });
 
   if (request.gradeLevel) {
-    params.set('grade', request.gradeLevel);
+    params.set("grade", request.gradeLevel);
   }
 
-  const response = await fetch(`${API_BASE_URL}/curriculum/lesson?${params.toString()}`);
+  const response = await fetch(
+    `${API_BASE_URL}/curriculum/lesson?${params.toString()}`
+  );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || 'Failed to generate lesson');
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Network error" }));
+    throw new Error(error.error || "Failed to generate lesson");
   }
 
   return response.json();
 }
 
 export async function fetchLesson(
-  request: LessonRequest,
+  request: LessonRequest
 ): Promise<LessonResponse> {
   return generateLessonSession(request);
 }
 
 export async function* streamLessonSession(
-  request: LessonRequest,
+  request: LessonRequest
 ): AsyncGenerator<LessonStreamEvent> {
   const url = new URL(`${API_BASE_URL}/curriculum/lesson/stream`);
-  url.searchParams.set('country', request.country);
-  url.searchParams.set('language', request.language);
-  url.searchParams.set('subject', request.subject);
-  url.searchParams.set('topic', request.topic);
-  url.searchParams.set('index', String(Math.max(0, request.topicIndex)));
-  url.searchParams.set('totalTopics', String(Math.max(1, request.totalTopics)));
+  url.searchParams.set("country", request.country);
+  url.searchParams.set("language", request.language);
+  url.searchParams.set("subject", request.subject);
+  url.searchParams.set("topic", request.topic);
+  url.searchParams.set("index", String(Math.max(0, request.topicIndex)));
+  url.searchParams.set("totalTopics", String(Math.max(1, request.totalTopics)));
   if (request.gradeLevel) {
-    url.searchParams.set('grade', request.gradeLevel);
+    url.searchParams.set("grade", request.gradeLevel);
   }
 
   const controller = new AbortController();
@@ -147,8 +208,10 @@ export async function* streamLessonSession(
 
   if (!response.ok) {
     controller.abort();
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || 'Failed to start lesson stream');
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Network error" }));
+    throw new Error(error.error || "Failed to start lesson stream");
   }
 
   const reader = response.body?.getReader();
@@ -156,20 +219,25 @@ export async function* streamLessonSession(
 
   if (!reader) {
     controller.abort();
-    throw new Error('No response body');
+    throw new Error("No response body");
   }
 
-  let buffer = '';
+  let buffer = "";
 
-  const findDelimiter = (source: string): { index: number; length: number } | null => {
-    const newlineIndex = source.indexOf('\n\n');
-    const carriageIndex = source.indexOf('\r\n\r\n');
+  const findDelimiter = (
+    source: string
+  ): { index: number; length: number } | null => {
+    const newlineIndex = source.indexOf("\n\n");
+    const carriageIndex = source.indexOf("\r\n\r\n");
 
     if (newlineIndex === -1 && carriageIndex === -1) {
       return null;
     }
 
-    if (newlineIndex !== -1 && (carriageIndex === -1 || newlineIndex < carriageIndex)) {
+    if (
+      newlineIndex !== -1 &&
+      (carriageIndex === -1 || newlineIndex < carriageIndex)
+    ) {
       return { index: newlineIndex, length: 2 };
     }
 
@@ -192,15 +260,15 @@ export async function* streamLessonSession(
 
       const dataPayload = rawEvent
         .split(/\r?\n/)
-        .filter((line) => line.startsWith('data:'))
+        .filter((line) => line.startsWith("data:"))
         .map((line) => line.slice(5).trim())
-        .join('\n');
+        .join("\n");
 
       if (!dataPayload) {
         continue;
       }
 
-      if (dataPayload === '[DONE]') {
+      if (dataPayload === "[DONE]") {
         doneSignal = true;
         break;
       }
@@ -258,41 +326,46 @@ export async function* streamCurriculum(
   request: CurriculumRequest
 ): AsyncGenerator<CurriculumResponse> {
   const url = new URL(`${API_BASE_URL}/curriculum/generate-stream`);
-  url.searchParams.set('country', request.country);
-  url.searchParams.set('language', request.language);
+  url.searchParams.set("country", request.country);
+  url.searchParams.set("language", request.language);
   if (request.gradeLevel) {
-    url.searchParams.set('gradeLevel', request.gradeLevel);
+    url.searchParams.set("gradeLevel", request.gradeLevel);
   }
   if (request.subjects && request.subjects.length > 0) {
     for (const subject of request.subjects) {
-      url.searchParams.append('subject', subject);
+      url.searchParams.append("subject", subject);
     }
   }
 
   const response = await fetch(url.toString());
 
   if (!response.ok) {
-    throw new Error('Failed to start curriculum stream');
+    throw new Error("Failed to start curriculum stream");
   }
 
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
 
   if (!reader) {
-    throw new Error('No response body');
+    throw new Error("No response body");
   }
 
-  let buffer = '';
+  let buffer = "";
 
-  const findDelimiter = (source: string): { index: number; length: number } | null => {
-    const newlineIndex = source.indexOf('\n\n');
-    const carriageIndex = source.indexOf('\r\n\r\n');
+  const findDelimiter = (
+    source: string
+  ): { index: number; length: number } | null => {
+    const newlineIndex = source.indexOf("\n\n");
+    const carriageIndex = source.indexOf("\r\n\r\n");
 
     if (newlineIndex === -1 && carriageIndex === -1) {
       return null;
     }
 
-    if (newlineIndex !== -1 && (carriageIndex === -1 || newlineIndex < carriageIndex)) {
+    if (
+      newlineIndex !== -1 &&
+      (carriageIndex === -1 || newlineIndex < carriageIndex)
+    ) {
       return { index: newlineIndex, length: 2 };
     }
 
@@ -315,15 +388,15 @@ export async function* streamCurriculum(
 
       const dataPayload = rawEvent
         .split(/\r?\n/)
-        .filter((line) => line.startsWith('data:'))
+        .filter((line) => line.startsWith("data:"))
         .map((line) => line.slice(5).trim())
-        .join('\n');
+        .join("\n");
 
       if (!dataPayload) {
         continue;
       }
 
-      if (dataPayload === '[DONE]') {
+      if (dataPayload === "[DONE]") {
         doneSignal = true;
         break;
       }
@@ -367,7 +440,7 @@ export async function* streamCurriculum(
 }
 
 export interface TutorChatHistoryEntry {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -389,12 +462,12 @@ export interface TutorChatResponse {
 }
 
 export async function askTutor(
-  request: TutorChatRequest,
+  request: TutorChatRequest
 ): Promise<TutorChatResponse> {
   const response = await fetch(`${API_BASE_URL}/curriculum/tutor-chat`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(request),
   });
@@ -402,7 +475,7 @@ export async function askTutor(
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.error || 'Failed to get tutor response');
+    throw new Error(payload.error || "Failed to get tutor response");
   }
 
   return payload as TutorChatResponse;

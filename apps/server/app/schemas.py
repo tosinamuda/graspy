@@ -28,11 +28,15 @@ class UsersResponse(BaseModel):
     users: List[User]
 
 
+class CurriculumSubjectInput(BaseModel):
+    id: str = Field(description="English slug/ID of the subject")
+    label: str = Field(description="Localized label of the subject")
+
 class CurriculumRequest(BaseModel):
-    country: str
-    language: str
-    grade_level: Optional[str] = Field(default=None, alias="gradeLevel")
-    subjects: Optional[List[str]] = None
+    country: str = Field(description="Full name of the country (e.g. Nigeria)")
+    language: str = Field(description="Full name of the language (e.g. Yoruba)")
+    grade_level: Optional[str] = Field(default=None, alias="gradeLevel", description="Grade level (e.g. Grade 2, JSS 1, Year 5, Middle School)")
+    subjects: Optional[List[CurriculumSubjectInput | str]] = None 
 
     model_config = {
         "populate_by_name": True,
@@ -41,7 +45,10 @@ class CurriculumRequest(BaseModel):
                 "country": "Nigeria",
                 "language": "English",
                 "gradeLevel": "middle school",
-                "subjects": ["Mathematics", "Science", "Civic Education"],
+                "subjects": [
+                    {"id": "mathematics", "label": "Mathematics"},
+                    {"id": "civic_education", "label": "Civic Education"}
+                ],
             }
         },
     }
@@ -78,8 +85,8 @@ class CurriculumTopics(BaseModel):
 
 
 class LessonRequest(BaseModel):
-    country: str
-    language: str
+    country: str = Field(description="Full name of the country (e.g. Kenya)")
+    language: str = Field(description="Full name of the language (e.g. Swahili)")
     subject: str
     topic: str
     grade_level: Optional[str] = Field(default=None, alias="gradeLevel")
@@ -104,7 +111,7 @@ class LessonRequest(BaseModel):
 
 class LessonPractice(BaseModel):
     question: str
-    options: List[str] = Field(min_length=3, max_length=3)
+    options: List[str] = Field(min_length=2, max_length=5)
     answer_index: int = Field(alias="answerIndex")
     correct_feedback: str = Field(alias="correctFeedback")
     incorrect_feedback: str = Field(alias="incorrectFeedback")
@@ -115,7 +122,7 @@ class LessonPractice(BaseModel):
 class LessonSlideAssessment(BaseModel):
     type: Literal["choice"] = "choice"
     prompt: str
-    options: List[str] = Field(min_length=3, max_length=3)
+    options: List[str] = Field(min_length=2, max_length=5)
     answer_index: int = Field(alias="answerIndex")
     correct_feedback: str = Field(alias="correctFeedback")
     incorrect_feedback: str = Field(alias="incorrectFeedback")
@@ -173,7 +180,7 @@ class LessonPayload(BaseModel):
     content: str
     key_points: List[str] = Field(alias="keyPoints")
     slides: List[LessonSlide] = Field(default_factory=list)
-    examples: List[str]
+    examples: List[str] = Field(default_factory=list)
     practice: LessonPractice
     progress: LessonProgress
 
@@ -219,7 +226,7 @@ class LessonSlidesPayload(BaseModel):
 
 class LessonPracticePayload(BaseModel):
     question: str
-    options: List[str] = Field(min_length=3, max_length=3)
+    options: List[str] = Field(min_length=2, max_length=5)
     correct_option_index: int
     correct_feedback: str
     incorrect_feedback: str
@@ -252,11 +259,7 @@ class SubjectCandidate(BaseModel):
 class SubjectGenerationRequest(BaseModel):
     country: str
     language: str
-    education_status: Literal["in_school", "out_of_school"] = Field(alias="educationStatus")
     grade_level: Optional[str] = Field(default=None, alias="gradeLevel")
-    school_grade: Optional[str] = Field(default=None, alias="schoolGrade")
-    age_range: Optional[str] = Field(default=None, alias="ageRange")
-    interests: Optional[List[str]] = None
 
     model_config = {"populate_by_name": True}
 
@@ -308,3 +311,13 @@ class TutorChatResponse(BaseModel):
     navigation_tip: Optional[str] = Field(default=None, alias="navigationTip")
 
     model_config = {"populate_by_name": True}
+
+
+class StudyChatRequest(BaseModel):
+    message: str
+    language: str
+    history: List[Dict[str, str]] = Field(default_factory=list)
+
+
+class StudyChatResponse(BaseModel):
+    answer: str

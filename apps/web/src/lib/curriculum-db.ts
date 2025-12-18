@@ -1,19 +1,21 @@
-import type { LessonSlide } from '@/lib/lesson-types';
-import { normalizeSubjectList } from '@/lib/slug';
+import type { LessonSlide } from "@/lib/lesson-types";
+import { normalizeSubjectList } from "@/lib/slug";
 
 /**
  * IndexedDB utilities for curriculum and chat storage
  */
 
-const DB_NAME = 'graspy-db';
+const DB_NAME = "graspy-db";
 const DB_VERSION = 1;
-const CURRICULUM_STORE = 'curriculum';
-const CHAT_STORE = 'chat-history';
+const CURRICULUM_STORE = "curriculum";
+const CHAT_STORE = "chat-history";
 
 export interface CurriculumData {
   id: string;
   country: string;
+  countryName?: string;
   language: string;
+  languageName?: string;
   gradeLevel: string;
   subjects: CurriculumSubject[];
   topics?: Record<string, string[]>;
@@ -42,7 +44,7 @@ export interface LearningSession {
     incorrectFeedback: string;
   };
   slides?: LessonSlide[];
-  phase: 'explanation' | 'practice' | 'feedback' | 'complete';
+  phase: "explanation" | "practice" | "feedback" | "complete";
   answerIndex?: number;
   isCorrect?: boolean;
   metadata?: {
@@ -56,12 +58,19 @@ export interface LearningSession {
 
 export interface ChatMessage {
   id: string;
-  type: 'system' | 'status' | 'subject' | 'complete' | 'error' | 'user' | 'component';
+  type:
+    | "system"
+    | "status"
+    | "subject"
+    | "complete"
+    | "error"
+    | "user"
+    | "component";
   content: string;
   timestamp: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: any;
-  sender: 'ai' | 'user';
+  sender: "ai" | "user";
 }
 
 export interface CurriculumSubject {
@@ -71,7 +80,8 @@ export interface CurriculumSubject {
 
 type LegacyCurriculumSubject = string | CurriculumSubject;
 
-interface LegacyCurriculumData extends Omit<CurriculumData, 'subjects' | 'topics' | 'assessment'> {
+interface LegacyCurriculumData
+  extends Omit<CurriculumData, "subjects" | "topics" | "assessment"> {
   subjects: LegacyCurriculumSubject[];
   topics?: Record<string, string[]>;
   assessment?: {
@@ -80,13 +90,18 @@ interface LegacyCurriculumData extends Omit<CurriculumData, 'subjects' | 'topics
 }
 
 function normalizeCurriculumData(
-  input: (CurriculumData | LegacyCurriculumData | null),
+  input: CurriculumData | LegacyCurriculumData | null
 ): CurriculumData | null {
   if (!input) {
     return null;
   }
 
-  const { subjects: rawSubjects, topics: rawTopics, assessment, ...rest } = input as LegacyCurriculumData;
+  const {
+    subjects: rawSubjects,
+    topics: rawTopics,
+    assessment,
+    ...rest
+  } = input as LegacyCurriculumData;
   const { subjects, nameToSlug } = normalizeSubjectList(rawSubjects ?? []);
 
   const topicsBySlug: Record<string, string[]> = {};
@@ -95,7 +110,11 @@ function normalizeCurriculumData(
   for (const subject of subjects) {
     const fromSlug = sourceTopics[subject.slug];
     const fromName = sourceTopics[subject.name];
-    const entries = Array.isArray(fromSlug) ? fromSlug : Array.isArray(fromName) ? fromName : [];
+    const entries = Array.isArray(fromSlug)
+      ? fromSlug
+      : Array.isArray(fromName)
+      ? fromName
+      : [];
     topicsBySlug[subject.slug] = [...entries];
   }
 
@@ -132,13 +151,13 @@ function openDB(): Promise<IDBDatabase> {
 
       // Create curriculum store
       if (!db.objectStoreNames.contains(CURRICULUM_STORE)) {
-        db.createObjectStore(CURRICULUM_STORE, { keyPath: 'id' });
+        db.createObjectStore(CURRICULUM_STORE, { keyPath: "id" });
       }
 
       // Create chat history store
       if (!db.objectStoreNames.contains(CHAT_STORE)) {
-        const chatStore = db.createObjectStore(CHAT_STORE, { keyPath: 'id' });
-        chatStore.createIndex('timestamp', 'timestamp', { unique: false });
+        const chatStore = db.createObjectStore(CHAT_STORE, { keyPath: "id" });
+        chatStore.createIndex("timestamp", "timestamp", { unique: false });
       }
     };
   });
@@ -146,13 +165,15 @@ function openDB(): Promise<IDBDatabase> {
 
 // Curriculum Operations
 
-export async function saveCurriculum(data: Omit<CurriculumData, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
+export async function saveCurriculum(
+  data: Omit<CurriculumData, "id" | "createdAt" | "updatedAt">
+): Promise<void> {
   const db = await openDB();
-  const tx = db.transaction(CURRICULUM_STORE, 'readwrite');
+  const tx = db.transaction(CURRICULUM_STORE, "readwrite");
   const store = tx.objectStore(CURRICULUM_STORE);
 
   const curriculum = normalizeCurriculumData({
-    id: 'current', // Single curriculum per user
+    id: "current", // Single curriculum per user
     ...data,
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -160,7 +181,7 @@ export async function saveCurriculum(data: Omit<CurriculumData, 'id' | 'createdA
 
   if (!curriculum) {
     db.close();
-    throw new Error('Failed to normalize curriculum data before saving');
+    throw new Error("Failed to normalize curriculum data before saving");
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -174,29 +195,35 @@ export async function saveCurriculum(data: Omit<CurriculumData, 'id' | 'createdA
 
 export async function getCurriculum(): Promise<CurriculumData | null> {
   const db = await openDB();
-  const tx = db.transaction(CURRICULUM_STORE, 'readonly');
+  const tx = db.transaction(CURRICULUM_STORE, "readonly");
   const store = tx.objectStore(CURRICULUM_STORE);
 
-  const curriculum = await new Promise<LegacyCurriculumData | undefined>((resolve, reject) => {
-    const request = store.get('current');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const curriculum = await new Promise<LegacyCurriculumData | undefined>(
+    (resolve, reject) => {
+      const request = store.get("current");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }
+  );
 
   db.close();
   return normalizeCurriculumData(curriculum ?? null);
 }
 
-export async function updateCurriculum(updates: Partial<CurriculumData>): Promise<void> {
+export async function updateCurriculum(
+  updates: Partial<CurriculumData>
+): Promise<void> {
   const db = await openDB();
-  const tx = db.transaction(CURRICULUM_STORE, 'readwrite');
+  const tx = db.transaction(CURRICULUM_STORE, "readwrite");
   const store = tx.objectStore(CURRICULUM_STORE);
 
-  const existing = await new Promise<LegacyCurriculumData | undefined>((resolve, reject) => {
-    const request = store.get('current');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const existing = await new Promise<LegacyCurriculumData | undefined>(
+    (resolve, reject) => {
+      const request = store.get("current");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }
+  );
 
   if (existing) {
     const normalizedExisting = normalizeCurriculumData(existing);
@@ -208,7 +235,7 @@ export async function updateCurriculum(updates: Partial<CurriculumData>): Promis
 
     if (!merged) {
       db.close();
-      throw new Error('Failed to normalize curriculum data during update');
+      throw new Error("Failed to normalize curriculum data during update");
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -223,11 +250,11 @@ export async function updateCurriculum(updates: Partial<CurriculumData>): Promis
 
 export async function deleteCurriculum(): Promise<void> {
   const db = await openDB();
-  const tx = db.transaction(CURRICULUM_STORE, 'readwrite');
+  const tx = db.transaction(CURRICULUM_STORE, "readwrite");
   const store = tx.objectStore(CURRICULUM_STORE);
 
   await new Promise<void>((resolve, reject) => {
-    const request = store.delete('current');
+    const request = store.delete("current");
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
@@ -238,17 +265,17 @@ export async function deleteCurriculum(): Promise<void> {
 // Chat History Operations
 
 export async function saveChatMessage(
-  message: Omit<ChatMessage, 'id' | 'timestamp'> & { sender?: 'ai' | 'user' },
+  message: Omit<ChatMessage, "id" | "timestamp"> & { sender?: "ai" | "user" }
 ): Promise<ChatMessage> {
   const db = await openDB();
-  const tx = db.transaction(CHAT_STORE, 'readwrite');
+  const tx = db.transaction(CHAT_STORE, "readwrite");
   const store = tx.objectStore(CHAT_STORE);
 
   const chatMessage: ChatMessage = {
     ...message,
     id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     timestamp: Date.now(),
-    sender: message.sender ?? 'ai',
+    sender: message.sender ?? "ai",
   };
 
   await new Promise<void>((resolve, reject) => {
@@ -263,7 +290,7 @@ export async function saveChatMessage(
 
 export async function getChatHistory(): Promise<ChatMessage[]> {
   const db = await openDB();
-  const tx = db.transaction(CHAT_STORE, 'readonly');
+  const tx = db.transaction(CHAT_STORE, "readonly");
   const store = tx.objectStore(CHAT_STORE);
 
   const messages = await new Promise<ChatMessage[]>((resolve, reject) => {
@@ -276,14 +303,14 @@ export async function getChatHistory(): Promise<ChatMessage[]> {
   return messages
     .map((message) => ({
       ...message,
-      sender: message.sender ?? 'ai',
+      sender: message.sender ?? "ai",
     }))
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
 export async function clearChatHistory(): Promise<void> {
   const db = await openDB();
-  const tx = db.transaction(CHAT_STORE, 'readwrite');
+  const tx = db.transaction(CHAT_STORE, "readwrite");
   const store = tx.objectStore(CHAT_STORE);
 
   await new Promise<void>((resolve, reject) => {
@@ -297,17 +324,19 @@ export async function clearChatHistory(): Promise<void> {
 
 export async function updateChatMessage(
   id: string,
-  updates: Partial<Omit<ChatMessage, 'id' | 'timestamp'>>,
+  updates: Partial<Omit<ChatMessage, "id" | "timestamp">>
 ): Promise<ChatMessage | null> {
   const db = await openDB();
-  const tx = db.transaction(CHAT_STORE, 'readwrite');
+  const tx = db.transaction(CHAT_STORE, "readwrite");
   const store = tx.objectStore(CHAT_STORE);
 
-  const existing = await new Promise<ChatMessage | undefined>((resolve, reject) => {
-    const request = store.get(id);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const existing = await new Promise<ChatMessage | undefined>(
+    (resolve, reject) => {
+      const request = store.get(id);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }
+  );
 
   if (!existing) {
     db.close();
@@ -322,7 +351,7 @@ export async function updateChatMessage(
     ...existing,
     ...updates,
     metadata: mergedMetadata,
-    sender: updates.sender ?? existing.sender ?? 'ai',
+    sender: updates.sender ?? existing.sender ?? "ai",
   };
 
   await new Promise<void>((resolve, reject) => {

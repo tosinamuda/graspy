@@ -3,16 +3,16 @@
  * Handles saving and retrieving user data from browser localStorage
  */
 
-import { setLocaleCookie } from './locale-cookie';
-import type { GradeLevelValue } from './constants';
+import { setLocaleCookie } from "./locale-cookie";
+import type { GradeLevelValue } from "./GRADE_LEVELS";
 
 export interface UserProfile {
   id: string;
   country: string;
   language: string;
   gradeLevel: string;
-  gradeLevelBand: GradeLevelValue | '';
-  educationStatus: 'in_school' | 'out_of_school' | '';
+  gradeLevelBand: GradeLevelValue | "";
+  educationStatus: "in_school" | "out_of_school" | "";
   knowsGradeLevel: boolean | null;
   schoolGrade: string;
   ageRange: string;
@@ -22,7 +22,7 @@ export interface UserProfile {
   onboardingCompleted: boolean;
 }
 
-const USER_PROFILE_KEY = 'graspy_user_profile';
+const USER_PROFILE_KEY = "graspy_user_profile";
 
 /**
  * Generate a simple unique ID
@@ -34,32 +34,34 @@ function generateUserId(): string {
 function withDefaults(profile: Partial<UserProfile>): UserProfile {
   const normalizedBand = (() => {
     const provided = profile.gradeLevelBand;
-    if (typeof provided === 'string' && provided) {
-      return provided as GradeLevelValue | '';
+    if (typeof provided === "string" && provided) {
+      return provided as GradeLevelValue | "";
     }
-    const candidate = (profile.gradeLevel ?? '').toLowerCase();
+    const candidate = (profile.gradeLevel ?? "").toLowerCase();
     if (
-      candidate === 'beginner' ||
-      candidate === 'elementary' ||
-      candidate === 'middle' ||
-      candidate === 'high'
+      candidate === "beginner" ||
+      candidate === "elementary" ||
+      candidate === "middle" ||
+      candidate === "high"
     ) {
       return candidate as GradeLevelValue;
     }
-    return '';
+    return "";
   })();
 
   return {
     id: profile.id ?? generateUserId(),
-    country: profile.country ?? '',
-    language: profile.language ?? '',
-    gradeLevel: profile.gradeLevel ?? '',
+    country: profile.country ?? "",
+    language: profile.language ?? "",
+    gradeLevel: profile.gradeLevel ?? "",
     gradeLevelBand: normalizedBand,
-    educationStatus: profile.educationStatus ?? '',
+    educationStatus: profile.educationStatus ?? "",
     knowsGradeLevel:
-      typeof profile.knowsGradeLevel === 'boolean' ? profile.knowsGradeLevel : null,
-    schoolGrade: profile.schoolGrade ?? '',
-    ageRange: profile.ageRange ?? '',
+      typeof profile.knowsGradeLevel === "boolean"
+        ? profile.knowsGradeLevel
+        : null,
+    schoolGrade: profile.schoolGrade ?? "",
+    ageRange: profile.ageRange ?? "",
     preferredSubjects: Array.isArray(profile.preferredSubjects)
       ? profile.preferredSubjects
       : [],
@@ -98,7 +100,7 @@ export function saveUserProfile(profile: Partial<UserProfile>): UserProfile {
  * Get user profile from localStorage
  */
 export function getUserProfile(): UserProfile | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
   try {
     const stored = localStorage.getItem(USER_PROFILE_KEY);
@@ -106,7 +108,7 @@ export function getUserProfile(): UserProfile | null {
     const parsed = JSON.parse(stored) as Partial<UserProfile>;
     return withDefaults(parsed);
   } catch (error) {
-    console.error('Error reading user profile:', error);
+    console.error("Error reading user profile:", error);
     return null;
   }
 }

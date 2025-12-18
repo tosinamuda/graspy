@@ -5,12 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import api_router
 from .settings import Settings, get_settings
-from .services.curriculum import CurriculumService
-from .services.lessons import LessonService
-from .services.subjects import SubjectService
-from .services.users import UserService
-from .services.tutor import TutorService
-from .services.strands import StrandsRuntime
+from .domains.curriculum.service import CurriculumService
+from .domains.lesson.service_staged import LessonService
+from .domains.subjects.service import SubjectService
+from .domains.user.service import UserService
+from .domains.tutor.service import TutorService
+from .domains.study.service import StudyService
+from .config.llm import configure_llm
 
 import logging
 
@@ -25,6 +26,9 @@ logging.basicConfig(
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+
+    # Configure LLM (DSPy)
+    configure_llm(settings)
 
     app = FastAPI(
         title="Graspy API",
@@ -44,14 +48,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    strands_runtime = StrandsRuntime(settings=settings)
     app.state.settings = settings
-    app.state.strands_runtime = strands_runtime
     app.state.user_service = UserService(settings=settings)
-    app.state.curriculum_service = CurriculumService(runtime=strands_runtime)
-    app.state.lesson_service = LessonService(runtime=strands_runtime)
-    app.state.subject_service = SubjectService(runtime=strands_runtime)
-    app.state.tutor_service = TutorService(runtime=strands_runtime)
+    app.state.curriculum_service = CurriculumService()
+    app.state.lesson_service = LessonService()
+    app.state.subject_service = SubjectService()
+    app.state.tutor_service = TutorService()
+    app.state.study_service = StudyService()
 
     app.include_router(api_router, prefix="/api")
 

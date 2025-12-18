@@ -13,6 +13,7 @@ from ..dependencies import (
     get_settings,
     get_subject_service,
     get_tutor_service,
+    get_study_service,
     get_user_service,
 )
 from ..schemas import (
@@ -27,15 +28,18 @@ from ..schemas import (
     SubjectStreamEvent,
     TutorChatRequest,
     TutorChatResponse,
+    StudyChatRequest,
+    StudyChatResponse,
     UsersResponse,
     UserCreate,
     UserUpdate,
 )
-from ..services.curriculum import CurriculumService
-from ..services.lessons import LessonService
-from ..services.subjects import SubjectService
-from ..services.tutor import TutorService
-from ..services.users import UserService
+from ..domains.curriculum.service import CurriculumService
+from ..domains.lesson.service_staged import LessonService
+from ..domains.subjects.service import SubjectService
+from ..domains.tutor.service import TutorService
+from ..domains.study.service import StudyService
+from ..domains.user.service import UserService
 from ..settings import Settings
 
 api_router = APIRouter()
@@ -104,6 +108,23 @@ async def tutor_chat(
 
 
 @api_router.post(
+    "/study/chat",
+    response_model=StudyChatResponse,
+    tags=["study"],
+)
+async def study_chat(
+    payload: StudyChatRequest,
+    study_service: StudyService = Depends(get_study_service),
+) -> StudyChatResponse:
+    result = await study_service.chat(
+        history=payload.history, 
+        message=payload.message, 
+        language=payload.language
+    )
+    return StudyChatResponse(answer=result["answer"])
+
+
+@api_router.post(
     "/curriculum/generate",
     response_model=CurriculumResponse,
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
@@ -141,13 +162,35 @@ async def generate_curriculum_stream(
 
         async def pump_stream():
             try:
-                async for event in curriculum_service.stream_curriculum(request_payload):
+                subjects_list = []
+                if request_payload.subjects:
+                    for s in request_payload.subjects:
+                        if hasattr(s, "id"):
+                            subjects_list.append(s.id)
+                        else:
+                            subjects_list.append(str(s))
+
+                # Unpack payload as service expects individual arguments
+                async for event in curriculum_service.generate_stream(
+                    country=request_payload.country,
+                    language=request_payload.language,
+                    grade_level=request_payload.grade_level,
+                    subjects=subjects_list
+                    # Note: CurriculumRequest subjects is List[CurriculumSubjectInput] or List[str] depending on parsing.
+                    # Service expects dict or string? Checking service def: List[Union[str, CurriculumSubjectInput, dict]].
+                    # Let's pass request_payload.subjects directly if schema matches, or unpack if needed.
+                    # Service `generate` handles list of strings or dicts.
+                    # Schema has `subjects: Optional[List[CurriculumSubjectInput | str]]`.
+                ):
                     await queue.put(
                         {
                             "event": "message",
-                            "data": json.dumps(event.model_dump(by_alias=True, exclude_none=True)),
-                        },
+                            "data": event
+                        }
                     )
+
+# ... (skipping to next chunk) ...
+
             finally:
                 await queue.put(None)
 
@@ -197,7 +240,13 @@ async def generate_lesson(
     response: Response,
     lesson_service: LessonService = Depends(get_lesson_service),
 ) -> LessonResponse:
-    result = await lesson_service.generate_lesson(payload)
+    result = await lesson_service.generate_lesson(
+        country=payload.country,
+        language=payload.language,
+        subject=payload.subject,
+        topic=payload.topic,
+        grade_level=payload.grade_level or "Standard"
+    )
     response.headers["Cache-Control"] = CACHE_CONTROL_HEADER
     response.headers["X-Cache"] = "MISS"
     return result
@@ -276,11 +325,18 @@ async def stream_lesson(
 
         async def pump_stream():
             try:
-                async for event in lesson_service.stream_lesson(request_payload):
+                async for event in lesson_service.generate_stream(
+                    country=request_payload.country,
+                    language=request_payload.language,
+                    subject=request_payload.subject,
+                    topic=request_payload.topic,
+                    grade_level=request_payload.grade_level
+                ):
+
                     await queue.put(
                         {
                             "event": "message",
-                            "data": event.model_dump_json(by_alias=True, exclude_none=True),
+                            "data": event,
                         },
                     )
             except HTTPException as exc:
@@ -354,28 +410,24 @@ async def stream_lesson(
 async def generate_subjects_stream(
     country: str = Query(...),
     language: str = Query(...),
-    education_status: str = Query(..., alias="educationStatus"),
     grade_level: str | None = Query(None, alias="gradeLevel"),
-    school_grade: str | None = Query(None, alias="schoolGrade"),
-    age_range: str | None = Query(None, alias="ageRange"),
-    interests: list[str] | None = Query(None, alias="interest"),
     subject_service: SubjectService = Depends(get_subject_service),
 ) -> EventSourceResponse:
     request_payload = SubjectGenerationRequest(
         country=country,
         language=language,
-        educationStatus=education_status,
         gradeLevel=grade_level,
-        schoolGrade=school_grade,
-        ageRange=age_range,
-        interests=interests,
     )
 
     async def event_publisher():
-        async for event in subject_service.stream_subjects(request_payload):
+        async for event in subject_service.generate_stream(
+            country=request_payload.country,
+            language=request_payload.language,
+            grade_level=request_payload.grade_level
+        ):
             yield {
                 "event": "message",
-                "data": event.model_dump_json(by_alias=True),
+                "data": event
             }
         yield {"event": "message", "data": "[DONE]"}
 

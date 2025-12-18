@@ -1,14 +1,17 @@
-'use client';
+"use client";
 
-import { useCurriculum } from '@/hooks/useCurriculum';
-import { getCountryName, getLanguageInfo } from '@/lib/constants';
+import { useCurriculum } from "@/hooks/useCurriculum";
+import { getCountryName, getLanguageInfo } from "@/lib/locale";
 
 interface CurriculumGeneratorProps {
   country: string;
   language: string;
 }
 
-export default function CurriculumGenerator({ country, language }: CurriculumGeneratorProps) {
+export default function CurriculumGenerator({
+  country,
+  language,
+}: CurriculumGeneratorProps) {
   const { data, loading, error, generateWithStream } = useCurriculum();
 
   const handleGenerate = async () => {
@@ -18,9 +21,12 @@ export default function CurriculumGenerator({ country, language }: CurriculumGen
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Generate Curriculum</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          Generate Curriculum
+        </h2>
         <p className="text-gray-600">
-          AI-powered curriculum for {getCountryName(country)} in {getLanguageInfo(language).nativeName}
+          AI-powered curriculum for {getCountryName(country)} in{" "}
+          {getLanguageInfo(language).nativeName}
         </p>
       </div>
 
@@ -36,7 +42,9 @@ export default function CurriculumGenerator({ country, language }: CurriculumGen
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <span className="ml-3 text-gray-600">{data?.currentStep || 'Generating...'}</span>
+          <span className="ml-3 text-gray-600">
+            {data?.currentStep || "Generating..."}
+          </span>
         </div>
       )}
 
@@ -50,9 +58,12 @@ export default function CurriculumGenerator({ country, language }: CurriculumGen
       {data && data.subjects.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Generated Subjects</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Generated Subjects
+            </h3>
             <span className="text-sm text-gray-500">
-              {data.subjects.length} {data.subjects.length === 1 ? 'subject' : 'subjects'}
+              {data.subjects.length}{" "}
+              {data.subjects.length === 1 ? "subject" : "subjects"}
             </span>
           </div>
           <div className="grid gap-3">
