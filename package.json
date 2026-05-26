@@ -23,5 +23,8 @@
   ],
   "devDependencies": {
     "turbo": "^2.5.8"
+  },
+  "overrides": {
+    "postcss": "^8.5.15"
   }
 }
